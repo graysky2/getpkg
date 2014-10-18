@@ -1,0 +1,45 @@
+#!/bin/bash
+# Optionally define a work directory.
+work=/scratch
+
+# Uncomment to end in trunk. If left commented, end in the official repos.
+favor=testing
+
+$(which svn >/dev/null)
+[[ $? -ne 0 ]] && echo "I require subversion to operate." && return 1
+
+getpkg() {
+	[[ -z "$work" ]] && work=$(pwd)
+
+	if [[ -z "$1" ]]; then
+		echo "Supply a package name and try again."
+		return 1
+	else
+		[[ -d "$work/packages/$1" ]] && rm -rf "$work/packages/$1"
+		svn checkout --depth=empty svn://svn.archlinux.org/packages "$work/packages"
+		svn update "$work/packages/$1" &>/dev/null
+		if [[ -d "$work/packages/$1" ]]; then
+			svn update "$work/packages/$1"
+			cd "$work/packages/$1"
+		else
+			svn checkout --depth=empty svn://svn.archlinux.org/community "$work/community"
+			svn update "$work/community/$1"
+			if [[ -d "$work/community/$1" ]]; then
+				svn update "$work/community/$1" &>/dev/null
+				cd "$work/community/$1"
+			else
+				echo "Could not find $1 in the official repos."
+				return 1
+			fi
+		fi
+	fi
+
+	if [[ "$favor" = "testing" ]]; then
+		cd trunk
+		return 0
+	else
+		for i in core-x86_64 extra-x86_64 community-x86_64; do
+			[[ -d repos/$i ]] && cd repos/$i
+		done
+	fi
+}
