@@ -1,32 +1,31 @@
 #!/bin/bash
 # Optionally define a work directory.
 work=/scratch
+tmp="$XDG_RUNTIME_DIR/getpkg"
 
 # Uncomment to end in trunk. If left commented, end in the official repos.
-favor=testing
-
-$(which svn >/dev/null)
-[[ $? -ne 0 ]] && echo "I require subversion to operate." && return 1
-
+favor=trunk
 getpkg() {
-	[[ -z "$work" ]] && work=$(pwd)
+	$(which svn >/dev/null)
+	[[ $? -ne 0 ]] && echo "I require subversion to operate." && return 1
+	[[ -d "$tmp" ]] || mkdir -p "$tmp"
 
 	if [[ -z "$1" ]]; then
 		echo "Supply a package name and try again."
 		return 1
 	else
-		[[ -d "$work/packages/$1" ]] && rm -rf "$work/packages/$1"
-		svn checkout --depth=empty svn://svn.archlinux.org/packages "$work/packages"
-		svn update "$work/packages/$1" &>/dev/null
-		if [[ -d "$work/packages/$1" ]]; then
-			svn update "$work/packages/$1"
-			cd "$work/packages/$1"
+		[[ -d "$tmp/packages/$1" ]] && rm -rf "$tmp/packages/$1"
+		svn checkout --depth=empty svn://svn.archlinux.org/packages "$tmp/packages"
+		svn update "$tmp/packages/$1" &>/dev/null
+		if [[ -d "$tmp/packages/$1" ]]; then
+			svn update "$tmp/packages/$1"
+			mv "$tmp/packages/$1" "$work/$1"
 		else
-			svn checkout --depth=empty svn://svn.archlinux.org/community "$work/community"
-			svn update "$work/community/$1"
-			if [[ -d "$work/community/$1" ]]; then
-				svn update "$work/community/$1" &>/dev/null
-				cd "$work/community/$1"
+			svn checkout --depth=empty svn://svn.archlinux.org/community "$tmp/community"
+			svn update "$tmp/community/$1"
+			if [[ -d "$tmp/community/$1" ]]; then
+				svn update "$tmp/community/$1" &>/dev/null
+				mv "$tmp/community/$1" "$work/$1"
 			else
 				echo "Could not find $1 in the official repos."
 				return 1
@@ -34,12 +33,14 @@ getpkg() {
 		fi
 	fi
 
-	if [[ "$favor" = "testing" ]]; then
-		cd trunk
+	if [[ -n "$favor" ]]; then
+		cd "$work/$1/trunk"
 		return 0
 	else
 		for i in core-x86_64 extra-x86_64 community-x86_64; do
-			[[ -d repos/$i ]] && cd repos/$i
+			[[ -d "$work/$1/repos/$i" ]] && cd "$work/$1/repos/$i"
 		done
 	fi
+
+	rm -rf "$tmp"
 }
